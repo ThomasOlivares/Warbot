@@ -5,38 +5,56 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to bteam-ask-for-energy [ b n ]
-  ask b [ if (energy > 6000) [ give-energy myself n ]]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Explication des variables mémoires
+;; mem5 : 0 = pas de target
+;;        1 = a une target
+;;        2 = effectue un siège
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to durandil-ask-for-energy [ b n ]
+  ask b [ if (energy > 1000) [ give-energy myself n ]]
 end
 
-to bteam-go-back-to-base
-  if (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  [
-    let b min-one-of my-bases [ distance myself ]
-    ifelse (distance b <= 2)
+to durandil-go-back-to-base
+  ;; détermine la base la plus proche
+  let b min-one-of my-bases [ distance myself ]
+  ;; si le robot est arrivé à la base
+  ifelse (distance b <= 2)
     [ 
-      if (carrying-food? > 1000) [ give-food b carrying-food? ]
-      if (energy < 500) [ bteam-ask-for-energy b 500 ]
+      ;; charge la stratégie
+      set mem5 [mem5] of b
+      ;; dépose sa nourriture
+      give-food b carrying-food?
+      ;; demande de l'énergie si il reste moins de 500
+      if (energy < 500) [ durandil-ask-for-energy b 500 ]
+      ;; demande de l'énergie pour créer 5 missiles
       if ((Breed = RocketLaunchers) and (nb-missiles = 0)) [
-        bteam-ask-for-energy b 500
+        durandil-ask-for-energy b 500
         new-missile 5
       ]
+      set mem4 0
     ]
+  ;; sinon
     [
+      ;; s'oriente vers la base avec un peu d'aléatoire
       set heading towards b - 20 + random 40
-      if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
+      ;; fait un quart de tour à droite si il y a du monde devant
+      if (not free-ahead? 2) [ rt random 90 ]
+      ;; avance
       forward-move speed
     ]
-  ]
 end
 
-to bteam-go-and-eat
+to durandil-team-go-and-eat
   if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) [
     random-move
   ]
 end
 
-to bteam-harvesters-go-and-eat
+to durandil-team-harvesters-go-and-eat
   let b min-one-of perceive-food [ distance self ]
   ifelse (b != nobody) [ 
     ifelse (distance b) <= 2
@@ -49,20 +67,30 @@ to bteam-harvesters-go-and-eat
   [ random-move ]
 end
 
-to-report bteam-no-target?
+to-report durandil-no-target?
   report mem5 = 0
 end
 
-to bteam-set-target [ x y espece ]
-  set mem0 x set mem1 y set mem2 espece set mem5 1
+to durandil-set-target [ x y espece ]
+  set mem0 x 
+  set mem1 y 
+  set mem2 espece 
+  set mem5 1
 end
 
-to bteam-call-rocket-launcher [ x y espece ]
+to durandil-set-target-base [ x y espece ]
+  set mem0 x
+  set mem1 y
+  set mem2 espece
+  set mem5 2
+end
+
+to durandil-call-rocket-launcher [ x y espece ]
   let rl min-one-of perceive color RocketLaunchers [ distancexy x y ]
-  if (rl != nobody) [ ask rl [ bteam-set-target x y espece ]]
+  if (rl != nobody) [ ask rl [ durandil-set-target x y espece ]]
 end
 
-to bteam-call-explorer [ x y espece ]
+to durandil-call-explorer [ x y espece ]
   let ex one-of perceive color Explorers
   if (ex != nobody) [
     ask ex [
@@ -74,8 +102,8 @@ to bteam-call-explorer [ x y espece ]
   ]
 end
 
-to bteam-select-target
-  if (bteam-no-target?)
+to durandil-select-target
+  if (durandil-no-target?)
   [
     let h min-one-of perceive-robots ennemy [ distance myself ]
     ifelse ( h != nobody ) [
@@ -84,15 +112,30 @@ to bteam-select-target
       set mem2 [breed] of h
       set mem5 1
     ]
-    [ set mem5 0 ]
+    [ durandil-reset-strategy]
   ]
 end
 
-to bteam-shoot 
-  if (not bteam-no-target?) 
+to durandil-reset-strategy
+  if (mem5 != 2)
+  [
+    set mem5 0
+  ]
+end
+
+to durandil-call-harvester [ x y ]
+  let h min-one-of perceive color harvesters [ distancexy x y ]
+  if (h != nobody) [ ask h [ basic-team-set-food-target x y ]]
+end
+
+to durandil-shoot 
+  if (not durandil-no-target?) 
   [
     ifelse (distancexy mem0 mem1 < detection-range)
-    [ launch-rocket towardsxy mem0 mem1 set mem5 0]
+    [ 
+      launch-rocket towardsxy mem0 mem1 
+      durandil-reset-strategy
+    ]
     [ set heading towardsxy mem0 mem1 - 20 + random 40
       if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
       forward-move speed
@@ -101,38 +144,120 @@ to bteam-shoot
   
 end
 
-to goRedExplorer
-  bteam-go-back-to-base
-  bteam-go-and-eat
+to durandil-drive-harvesters
+  let food one-of perceive-food
+  if (food != nobody) [
+    durandil-call-harvester [xcor] of food [ycor] of food 
+  ]
+end
 
-  ifelse (not bteam-no-target?) [
-    bteam-call-rocket-launcher mem0 mem1 mem2
-    bteam-call-explorer mem0 mem1 mem2
+to goRedExplorer
+;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
+  ifelse (energy < 500)
+  [ durandil-go-back-to-base ]
+  [ durandil-team-go-and-eat ]
+  
+  durandil-drive-harvesters
+
+  ifelse (not durandil-no-target?) [
+    durandil-call-rocket-launcher mem0 mem1 mem2
+    durandil-call-explorer mem0 mem1 mem2
   ]
   [ let h one-of perceive-robots ennemy
-    if ( h != nobody ) [ bteam-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
+    if ( h != nobody ) [ durandil-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
+  ]
+end
+
+
+to durandil-team-shoot 
+  if (not durandil-no-target?) 
+  [
+    ifelse (distancexy mem0 mem1 < detection-range)
+    [
+      launch-rocket towardsxy mem0 mem1
+      durandil-reset-strategy
+      
+    ]
+    [ set heading towardsxy mem0 mem1 - 20 + random 40
+      if (not free-ahead? 2) [ rt random 90 ]
+      forward-move speed
+    ]
   ]
 end
 
 to goRedRocketLauncher
-  bteam-go-back-to-base
-  bteam-select-target
-  bteam-shoot
-  bteam-go-and-eat
+;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
+  ifelse (energy < 10) or (nb-missiles = 0)
+  [
+    ;; rentre à la base si certaines conditions sont vérifiées
+    durandil-go-back-to-base
+  ]
+  [
+     durandil-team-go-and-eat
+  ]
+  ;; sinon sélectionne une cible
+  durandil-select-target
+  if (mem5 = 2)
+  [
+    let b one-of turtles with [ (xcor = -20) and (breed = Bases) ]
+    if (b != nobody)[
+      durandil-set-target-base [xcor] of b [ycor] of b b
+    ]
+  ]
+  ;; tire
+  durandil-team-shoot 
 
+  ;; crée un nouveau missile si plus de 3000 unités d'énergie
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
 to goRedHarvester
-  ;; rentre à la base si certaines conditions sont vérifiées
-  bteam-go-back-to-base
-  ;; cherche à manger
-  bteam-harvesters-go-and-eat
+  ifelse (mem4 = 1) or (carrying-food? > 1000) or (energy < 500)
+  [
+    ; retour à la base
+    set mem4 1
+    ;; rentre à la base si certaines conditions sont vérifiées
+    durandil-go-back-to-base
+    if (energy > 500) and (carrying-food? > 500) [ 
+      ;; détermine la distance de la base la plus proche
+      if (min [ distance myself ] of my-bases < 10) [
+        plant-seeds color max-seeds
+      ]
+    ]
+  ]
+  [
+    ;; cherche à manger
+    durandil-team-harvesters-go-and-eat
+  ]
+end
+
+to-report durandil-createUnits
+  let explPro 10
+  let rocketPro 40
+  let harvestPro 50
+  
+  let myType random(100)
+  if (myType < explPro)[ new-Explorer 1 self report 0]
+  set myType myType - explPro
+  if (myType < rocketPro)[ new-RocketLauncher 1 self report 0]
+  set myType myType - rocketPro
+  if (myType < harvestPro)[ new-Harvester 1 self report 0]
+  set myType myType - harvestPro
+end
+
+to durandil-attackBase
+  set mem5 2
 end
 
 to goRedBase
   set label energy
-  if (energy > 12000) [ new-RocketLauncher 1 self ]
+  if (nb-missiles < 10) and (energy > 5000) [ new-missile 50 ]
+  if (energy > 5500)[
+    let dummy durandil-createUnits
+  ]
+  if (energy_red > 5 * energy_green)[
+    durandil-attackBase
+  ]
   let t one-of perceive-specific-robots ennemy rocketlaunchers
   if (t != nobody) [
     launch-rocket towards t
@@ -153,4 +278,8 @@ end
 
 ;; procedure pour initialiser les bases rouges
 to initRedBase
+    ; cré des explorers, des harvesters et des rocket-launchers
+  new-Explorer 4 self
+  new-Harvester 3 self
+  new-RocketLauncher 2 self
 end
