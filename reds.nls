@@ -78,7 +78,7 @@ to durandil-harvesters-go-and-eat
     ifelse (mem5 = 1)
     [
       ifelse (distancexy mem0 mem1) <= 2
-      [set mem4 0]
+      [set mem5 0]
       [
         set heading towardsxy mem0 mem1
         forward-move speed
@@ -212,7 +212,7 @@ to goRedRocketLauncher
   durandil-select-target
   if (mem5 = 2)
   [
-    let b one-of turtles with [ (xcor = -20) and (breed = Bases) ]
+    let b min-one-of turtles with [ (xcor = -20) and (breed = Bases) ] [ distance self ]
     if (b != nobody)[
       durandil-set-target-base [xcor] of b [ycor] of b b
     ]
@@ -222,7 +222,6 @@ to goRedRocketLauncher
 
   ;; crée un nouveau missile si plus de 3000 unités d'énergie
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
-  if (mem5 = 2)[print("target : ") print(mem0) print(mem1)]
 end
 
 to goRedHarvester

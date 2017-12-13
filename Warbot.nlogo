@@ -1089,7 +1089,7 @@ CHOOSER
 display?
 display?
 "none" "energy" "missiles" "carrying-food?" "target"
-3
+4
 
 MONITOR
 32

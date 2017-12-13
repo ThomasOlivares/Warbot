@@ -74,11 +74,6 @@ to basic-team-harvesters-go-and-eat
   ]
 end
 
-;;
-;; la mémoire mem5 est à
-;; - 0 si le robot n'a pas de cible sélectionnée
-;; - 1 si le robot a une cible sélectionnée
-;;
 to-report basic-team-no-target?
   report mem5 = 0
 end
