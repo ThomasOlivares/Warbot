@@ -72,10 +72,12 @@ to-report durandil-no-target?
 end
 
 to durandil-set-target [ x y espece ]
-  set mem0 x 
-  set mem1 y 
-  set mem2 espece 
-  set mem5 1
+  if (mem5 != 2)[
+    set mem0 x 
+    set mem1 y 
+    set mem2 espece 
+    set mem5 1
+  ]
 end
 
 to durandil-set-target-base [ x y espece ]
@@ -209,6 +211,7 @@ to goRedRocketLauncher
 
   ;; crée un nouveau missile si plus de 3000 unités d'énergie
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
+  if (mem5 = 2)[print("target : ") print(mem0) print(mem1)]
 end
 
 to goRedHarvester
@@ -232,16 +235,16 @@ to goRedHarvester
 end
 
 to-report durandil-createUnits
-  let explPro 10
-  let rocketPro 40
-  let harvestPro 50
+  let explPro 0
+  let rocketPro 100
+  let harvestPro 0
   
   let myType random(100)
-  if (myType < explPro)[ new-Explorer 1 self report 0]
+  if (myType < explPro)[ new-Explorer 1 self report 0 ]
   set myType myType - explPro
-  if (myType < rocketPro)[ new-RocketLauncher 1 self report 0]
+  if (myType < rocketPro)[ new-RocketLauncher 1 self report 0 ]
   set myType myType - rocketPro
-  if (myType < harvestPro)[ new-Harvester 1 self report 0]
+  if (myType < harvestPro)[ new-Harvester 1 self report 0 ]
   set myType myType - harvestPro
 end
 
@@ -251,16 +254,12 @@ end
 
 to goRedBase
   set label energy
-  if (nb-missiles < 10) and (energy > 5000) [ new-missile 50 ]
-  if (energy > 5500)[
+  if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
+  if (energy > 12000)[
     let dummy durandil-createUnits
   ]
   if (energy_red > 5 * energy_green)[
     durandil-attackBase
-  ]
-  let t one-of perceive-specific-robots ennemy rocketlaunchers
-  if (t != nobody) [
-    launch-rocket towards t
   ]
 end
 

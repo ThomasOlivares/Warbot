@@ -212,7 +212,7 @@ end
 to goGreenBase
   set label energy
   if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
-  if (energy > 12000) [ new-RocketLauncher 1 self ]
+  if (energy > 12000) [ new-RocketLauncher 1 self]
   let t one-of perceive-specific-robots ennemy rocketlaunchers
   if (t != nobody) [
     launch-rocket towards t
