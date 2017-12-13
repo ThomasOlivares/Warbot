@@ -25,7 +25,10 @@ to durandil-go-back-to-base
   ifelse (distance b <= 2)
     [ 
       ;; charge la stratégie
-      set mem5 [mem5] of b
+      if (Breed = RocketLaunchers)
+      [
+        set mem5 [mem5] of b
+      ]
       ;; dépose sa nourriture
       give-food b carrying-food?
       ;; demande de l'énergie si il reste moins de 500
@@ -40,7 +43,8 @@ to durandil-go-back-to-base
   ;; sinon
     [
       ;; s'oriente vers la base avec un peu d'aléatoire
-      set heading towards b - 20 + random 40
+      ;;set heading towards b - 20 + random 40
+      set heading towards b
       ;; fait un quart de tour à droite si il y a du monde devant
       if (not free-ahead? 2) [ rt random 90 ]
       ;; avance
@@ -48,23 +52,40 @@ to durandil-go-back-to-base
     ]
 end
 
-to durandil-team-go-and-eat
+to durandil-go-and-eat
   if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) [
     random-move
   ]
 end
 
-to durandil-team-harvesters-go-and-eat
+to durandil-harvesters-go-and-eat
   let b min-one-of perceive-food [ distance self ]
   ifelse (b != nobody) [ 
     ifelse (distance b) <= 2
-      [ take b ]
-      [ set heading towards b - 20 + random 40
+      [ 
+        set mem0 [xcor] of b
+        set mem1 [ycor] of b
+        set mem5 1
+        take b
+      ]
+      [ ;;set heading towards b - 20 + random 40
+          set heading towards b
         if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
         forward-move speed
       ]
   ]
-  [ random-move ]
+  [ 
+    ifelse (mem5 = 1)
+    [
+      ifelse (distancexy mem0 mem1) <= 2
+      [set mem4 0]
+      [
+        set heading towardsxy mem0 mem1
+        forward-move speed
+      ]
+    ]
+    [random-move]
+  ]
 end
 
 to-report durandil-no-target?
@@ -127,51 +148,17 @@ end
 
 to durandil-call-harvester [ x y ]
   let h min-one-of perceive color harvesters [ distancexy x y ]
-  if (h != nobody) [ ask h [ basic-team-set-food-target x y ]]
+  if (h != nobody) [ ask h [ durandil-set-food-target x y ]]
+end
+
+to durandil-set-food-target [ x y ]
+  ;;if (durandil-no-target?) [ set mem0 x set mem1 y set mem5 1 ] 
+  set mem0 x 
+  set mem1 y 
+  set mem5 1
 end
 
 to durandil-shoot 
-  if (not durandil-no-target?) 
-  [
-    ifelse (distancexy mem0 mem1 < detection-range)
-    [ 
-      launch-rocket towardsxy mem0 mem1 
-      durandil-reset-strategy
-    ]
-    [ set heading towardsxy mem0 mem1 - 20 + random 40
-      if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
-      forward-move speed
-    ]
-  ]
-  
-end
-
-to durandil-drive-harvesters
-  let food one-of perceive-food
-  if (food != nobody) [
-    durandil-call-harvester [xcor] of food [ycor] of food 
-  ]
-end
-
-to goRedExplorer
-;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  ifelse (energy < 500)
-  [ durandil-go-back-to-base ]
-  [ durandil-team-go-and-eat ]
-  
-  durandil-drive-harvesters
-
-  ifelse (not durandil-no-target?) [
-    durandil-call-rocket-launcher mem0 mem1 mem2
-    durandil-call-explorer mem0 mem1 mem2
-  ]
-  [ let h one-of perceive-robots ennemy
-    if ( h != nobody ) [ durandil-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
-  ]
-end
-
-
-to durandil-team-shoot 
   if (not durandil-no-target?) 
   [
     ifelse (distancexy mem0 mem1 < detection-range)
@@ -187,6 +174,30 @@ to durandil-team-shoot
   ]
 end
 
+to durandil-drive-harvesters
+  let food one-of perceive-food
+  if (food != nobody) [
+    durandil-call-harvester [xcor] of food [ycor] of food 
+  ]
+end
+
+to goRedExplorer
+;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
+  ifelse (energy < 500)
+  [ durandil-go-back-to-base ]
+  [ durandil-go-and-eat ]
+  
+  durandil-drive-harvesters
+
+  ifelse (not durandil-no-target?) [
+    durandil-call-rocket-launcher mem0 mem1 mem2
+    durandil-call-explorer mem0 mem1 mem2
+  ]
+  [ let h one-of perceive-robots ennemy
+    if ( h != nobody ) [ durandil-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
+  ]
+end
+
 to goRedRocketLauncher
 ;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
   ifelse (energy < 10) or (nb-missiles = 0)
@@ -195,7 +206,7 @@ to goRedRocketLauncher
     durandil-go-back-to-base
   ]
   [
-     durandil-team-go-and-eat
+     durandil-go-and-eat
   ]
   ;; sinon sélectionne une cible
   durandil-select-target
@@ -207,7 +218,7 @@ to goRedRocketLauncher
     ]
   ]
   ;; tire
-  durandil-team-shoot 
+  durandil-shoot 
 
   ;; crée un nouveau missile si plus de 3000 unités d'énergie
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
@@ -230,7 +241,7 @@ to goRedHarvester
   ]
   [
     ;; cherche à manger
-    durandil-team-harvesters-go-and-eat
+    durandil-harvesters-go-and-eat
   ]
 end
 
@@ -260,6 +271,10 @@ to goRedBase
   ]
   if (energy_red > 5 * energy_green)[
     durandil-attackBase
+  ]
+  let t one-of perceive-specific-robots ennemy rocketlaunchers
+  if (t != nobody) [
+    launch-rocket towards t
   ]
 end
 
