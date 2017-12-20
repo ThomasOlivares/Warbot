@@ -1027,10 +1027,10 @@ NIL
 1
 
 MONITOR
-11
-80
-104
-125
+108
+79
+201
+124
 Base rouge 1
 [energy] of turtle 0
 3
@@ -1038,10 +1038,10 @@ Base rouge 1
 11
 
 MONITOR
-11
-127
-104
-172
+109
+129
+202
+174
 Base rouge 2
 [energy] of turtle 2
 3
@@ -1049,10 +1049,10 @@ Base rouge 2
 11
 
 SWITCH
-10
-190
-173
-223
+34
+189
+197
+222
 display-range?
 display-range?
 1
@@ -1060,10 +1060,10 @@ display-range?
 -1000
 
 MONITOR
-106
-127
-199
-172
+11
+129
+104
+174
 Base verte 2
 [energy] of turtle 4
 17
@@ -1071,10 +1071,10 @@ Base verte 2
 11
 
 MONITOR
-106
-80
-199
-125
+11
+79
+104
+124
 Base verte 1
 [energy] of turtle 6
 17
@@ -1082,9 +1082,9 @@ Base verte 1
 11
 
 CHOOSER
-10
+33
 227
-173
+196
 272
 display?
 display?
@@ -1092,10 +1092,10 @@ display?
 4
 
 MONITOR
-32
-312
-102
-357
+115
+291
+185
+336
 Reds
 energy_red
 1
@@ -1103,10 +1103,10 @@ energy_red
 11
 
 MONITOR
-104
-312
-174
-357
+39
+291
+109
+336
 Greens
 energy_green
 1
