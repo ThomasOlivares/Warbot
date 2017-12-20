@@ -8,9 +8,109 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Explication des variables mémoires
+;; mem3 : coordonnées des bases ennemies
 ;; mem5 : 0 = pas de target
 ;;        1 = a une target
 ;;        2 = effectue un siège
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;                          Memory
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to-report durandil-init-memory
+  report durandil-compact-memory [ 000 000 000 000 ]
+end
+
+to-report durandil-get-componant [ memory element ]
+  let l durandil-parse-memory memory
+  report item element l
+end
+
+to durandil-increment [nb]
+  set nb nb + 1
+end
+
+to-report durandil-reset-componant [ memory element ]
+  report durandil-set-componant memory element 0
+end
+
+to-report durandil-set-componant [ memory element value]
+  let result memory
+  let nb durandil-get-componant memory element
+  set result result - (nb * (1000 ^ element))
+  let val value
+  if (val < 0) [ set val (500 - val) ]
+  set result result + (val * (1000 ^ element))
+  report result
+end
+
+to durandil-copy-element [ memory element from to_ ]
+  let dummy durandil-set-componant [memory] of to_ element durandil-get-componant [memory] of from element
+end
+
+to-report durandil-compact-memory [ l ]
+  let result 0
+  let myList reverse l
+  let index 0
+  while ([index != 4])[
+    let nb item index myList
+    if (nb < 0)[
+      set nb (500 - nb)
+    ]
+    set result result + nb * (1000 ^ index)
+    set index index + 1
+  ]
+  set result result + 3 *(1000 ^ 4)
+  report result
+end
+
+to-report durandil-parse-memory [ n ]
+  let nombre n
+  let result []
+  let digits []
+  let i  1;
+  while ([nombre != 0])[
+    let digit nombre mod 10
+    set digits lput digit digits
+    set nombre nombre - digit
+    set nombre nombre / 10
+    set i i + 1
+  ]
+  set digits reverse digits
+  let nbDigits item 0 digits
+  let index 0
+  let indexbis 0
+  let nb 0
+  while ([index != 4])[
+    let digit item (index * 3 + indexbis + 1) digits
+    set nb nb + digit * (10 ^ indexbis)
+    ifelse(indexbis = 2)
+    [
+      set indexbis 0
+      set index index + 1
+      ifelse (nb < 500)
+      [
+        set result lput nb result
+      ]
+      [
+        set result lput (500 - nb) result
+      ]
+      set nb 0
+    ]
+    [
+      set indexbis indexbis + 1
+    ]
+  ]
+  report result
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;                          Général robot
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -27,7 +127,9 @@ to durandil-go-back-to-base
       ;; charge la stratégie
       if (Breed = RocketLaunchers)
       [
-        set mem5 [mem5] of b
+        ;; 0 = rocket launcher
+        let memBase durandil-get-componant [mem5] of b 0 
+        set mem5 memBase
       ]
       ;; dépose sa nourriture
       give-food b carrying-food?
@@ -53,8 +155,80 @@ to durandil-go-back-to-base
 end
 
 to durandil-go-and-eat
+  
   if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) [
     random-move
+  ]
+end
+
+to-report durandil-no-target?
+  report mem5 = 0
+end
+
+to durandil-set-target [ x y espece ]
+  if (mem5 != 2)[
+    set mem0 x 
+    set mem1 y 
+    set mem2 espece 
+    set mem5 1
+  ]
+end
+
+to durandil-set-target-base [ x y espece ]
+  set mem0 x
+  set mem1 y
+  set mem2 espece
+  set mem5 2
+end
+
+to durandil-select-target
+  
+  if (durandil-no-target?)
+  [
+    let h min-one-of perceive-robots ennemy [ distance myself ]
+    ifelse ( h != nobody ) [
+      set mem0 [xcor] of h
+      set mem1 [ycor] of h
+      set mem2 [breed] of h
+      set mem5 1
+    ]
+    [ durandil-reset-strategy]
+  ]
+end
+
+to durandil-reset-strategy
+  if (mem5 != 2)
+  [
+    set mem5 0
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;                          Harvasters
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to initRedHarvester
+end
+
+to goRedHarvester
+  ifelse (mem4 = 1) or (carrying-food? > 1000) or (energy < 500)
+  [
+    ; retour à la base
+    set mem4 1
+    ;; rentre à la base si certaines conditions sont vérifiées
+    durandil-go-back-to-base
+    if (energy > 500) and (carrying-food? > 500) [ 
+      ;; détermine la distance de la base la plus proche
+      if (min [ distance myself ] of my-bases < 10) [
+        plant-seeds color max-seeds
+      ]
+    ]
+  ]
+  [
+    ;; cherche à manger
+    durandil-harvesters-go-and-eat
   ]
 end
 
@@ -88,114 +262,19 @@ to durandil-harvesters-go-and-eat
   ]
 end
 
-to-report durandil-no-target?
-  report mem5 = 0
-end
-
-to durandil-set-target [ x y espece ]
-  if (mem5 != 2)[
-    set mem0 x 
-    set mem1 y 
-    set mem2 espece 
-    set mem5 1
-  ]
-end
-
-to durandil-set-target-base [ x y espece ]
-  set mem0 x
-  set mem1 y
-  set mem2 espece
-  set mem5 2
-end
-
-to durandil-call-rocket-launcher [ x y espece ]
-  let rl min-one-of perceive color RocketLaunchers [ distancexy x y ]
-  if (rl != nobody) [ ask rl [ durandil-set-target x y espece ]]
-end
-
-to durandil-call-explorer [ x y espece ]
-  let ex one-of perceive color Explorers
-  if (ex != nobody) [
-    ask ex [
-      set mem0 x 
-      set mem1 y
-      set mem2 espece
-      set mem5 1
-    ]
-  ]
-end
-
-to durandil-select-target
-  if (durandil-no-target?)
-  [
-    let h min-one-of perceive-robots ennemy [ distance myself ]
-    ifelse ( h != nobody ) [
-      set mem0 [xcor] of h
-      set mem1 [ycor] of h
-      set mem2 [breed] of h
-      set mem5 1
-    ]
-    [ durandil-reset-strategy]
-  ]
-end
-
-to durandil-reset-strategy
-  if (mem5 != 2)
-  [
-    set mem5 0
-  ]
-end
-
-to durandil-call-harvester [ x y ]
-  let h min-one-of perceive color harvesters [ distancexy x y ]
-  if (h != nobody) [ ask h [ durandil-set-food-target x y ]]
-end
-
 to durandil-set-food-target [ x y ]
-  ;;if (durandil-no-target?) [ set mem0 x set mem1 y set mem5 1 ] 
   set mem0 x 
   set mem1 y 
   set mem5 1
 end
 
-to durandil-shoot 
-  if (not durandil-no-target?) 
-  [
-    ifelse (distancexy mem0 mem1 < detection-range)
-    [
-      launch-rocket towardsxy mem0 mem1
-      durandil-reset-strategy
-      
-    ]
-    [ set heading towardsxy mem0 mem1 - 20 + random 40
-      if (not free-ahead? 2) [ rt random 90 ]
-      forward-move speed
-    ]
-  ]
-end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;                          Rocket-Launchers
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to durandil-drive-harvesters
-  let food one-of perceive-food
-  if (food != nobody) [
-    durandil-call-harvester [xcor] of food [ycor] of food 
-  ]
-end
-
-to goRedExplorer
-;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  ifelse (energy < 500)
-  [ durandil-go-back-to-base ]
-  [ durandil-go-and-eat ]
-  
-  durandil-drive-harvesters
-
-  ifelse (not durandil-no-target?) [
-    durandil-call-rocket-launcher mem0 mem1 mem2
-    durandil-call-explorer mem0 mem1 mem2
-  ]
-  [ let h one-of perceive-robots ennemy
-    if ( h != nobody ) [ durandil-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
-  ]
+to initRedRocketLauncher
 end
 
 to goRedRocketLauncher
@@ -224,24 +303,135 @@ to goRedRocketLauncher
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
-to goRedHarvester
-  ifelse (mem4 = 1) or (carrying-food? > 1000) or (energy < 500)
+to durandil-shoot 
+  if (not durandil-no-target?) 
   [
-    ; retour à la base
-    set mem4 1
-    ;; rentre à la base si certaines conditions sont vérifiées
-    durandil-go-back-to-base
-    if (energy > 500) and (carrying-food? > 500) [ 
-      ;; détermine la distance de la base la plus proche
-      if (min [ distance myself ] of my-bases < 10) [
-        plant-seeds color max-seeds
-      ]
+    ifelse (distancexy mem0 mem1 < detection-range)
+    [
+      launch-rocket towardsxy mem0 mem1
+      durandil-reset-strategy
+      
+    ]
+    [ set heading towardsxy mem0 mem1 - 20 + random 40
+      if (not free-ahead? 2) [ rt random 90 ]
+      forward-move speed
     ]
   ]
-  [
-    ;; cherche à manger
-    durandil-harvesters-go-and-eat
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;                          Explorers
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to initRedExplorer
+  set mem3 durandil-init-memory
+  set mem5 0
+end
+
+to goRedExplorer
+;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
+  ifelse (energy < 500 or mem4 = 1)
+  [ durandil-go-back-to-base ]
+  [ durandil-explorers-explore ]
+  
+  durandil-drive-harvesters
+
+  ifelse (not durandil-no-target?) [
+    durandil-call-rocket-launcher mem0 mem1 mem2
+    durandil-call-explorer mem0 mem1 mem2
   ]
+  [ let h one-of perceive-robots ennemy
+    if ( h != nobody ) [ durandil-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
+  ]
+end
+
+to durandil-explorers-explore
+  if (mem5 = 0)[
+    let b min-one-of perceive-base ennemy [ distance myself ]
+    ifelse (b != nobody)[
+      set mem4 1
+      let l durandil-parse-memory mem3
+      ifelse (item 0 l = 0)
+      [ 
+        set l (replace-item 0 l [xcor] of b) 
+        set l (replace-item 1 l [ycor] of b) 
+      ]
+      [
+        set l (replace-item 2 l [xcor] of b) 
+        set l (replace-item 3 l [ycor] of b)
+        set mem5 1
+      ]
+      set mem3 durandil-compact-memory l
+      durandil-go-back-to-base
+    ]
+    [
+      random-move
+    ]
+  ]
+end
+
+to durandil-call-rocket-launcher [ x y espece ]
+  let rl min-one-of perceive color RocketLaunchers [ distancexy x y ]
+  if (rl != nobody) [ ask rl [ durandil-set-target x y espece ]]
+end
+
+to durandil-call-explorer [ x y espece ]
+  let ex one-of perceive color Explorers
+  if (ex != nobody) [
+    ask ex [
+      set mem0 x 
+      set mem1 y
+      set mem2 espece
+      set mem5 1
+    ]
+  ]
+end
+
+to durandil-call-harvester [ x y ]
+  let h min-one-of perceive color harvesters [ distancexy x y ]
+  if (h != nobody) [ ask h [ durandil-set-food-target x y ]]
+end
+
+to durandil-drive-harvesters
+  let food one-of perceive-food
+  if (food != nobody) [
+    durandil-call-harvester [xcor] of food [ycor] of food 
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;                          Base
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to initRedBase
+    ; cré des explorers, des harvesters et des rocket-launchers
+  new-Explorer 4 self
+  new-Harvester 3 self
+  new-RocketLauncher 2 self
+  set mem3 durandil-init-memory
+  set mem5 durandil-init-memory
+end
+
+to goRedBase
+  set label energy
+  if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
+  if (energy > 12000)[
+    let dummy durandil-createUnits
+  ]
+  if (energy_red > 5 * energy_green)[
+    durandil-attackBase
+  ]
+  
+  let t one-of perceive-specific-robots ennemy rocketlaunchers
+  if (t != nobody) [
+    launch-rocket towards t
+  ]
+  
+  let dummy durandil-check-intel-explorers
 end
 
 to-report durandil-createUnits
@@ -259,40 +449,71 @@ to-report durandil-createUnits
 end
 
 to durandil-attackBase
-  set mem5 2
+  ;; 0 = rocket launcher
+  ;; 2 = mod attack
+  set mem5 durandil-set-componant mem5 0 2
 end
 
-to goRedBase
-  set label energy
-  if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
-  if (energy > 12000)[
-    let dummy durandil-createUnits
+to-report durandil-check-intel-explorers
+  ;; 1 = explorers, 1 = mode repérage de base
+  if (durandil-get-componant mem5 1 = 1)
+  [
+    let ex one-of perceive-specific-robots friend explorers
+    if (ex != nobody) [
+      ;; tell the explorer to go explore again
+      ask ex[
+        set mem4 0
+      ]
+      
+      ;; load intel of explorer
+      let intel1 list durandil-get-componant [mem3] of ex 0 durandil-get-componant [mem3] of ex 1
+      let intel2 list durandil-get-componant [mem3] of ex 2 durandil-get-componant [mem3] of ex 3
+      if (intel1 = [ 0 0 ] and intel2 = [ 0 0 ]) [ report 0 ]
+      
+      let intelBase1 list durandil-get-componant mem3 0 durandil-get-componant mem3 1
+      let intelBase2 list durandil-get-componant mem3 2 durandil-get-componant mem3 3
+      if (intelBase1 != [ 0 0 ] and intelBase2 != [ 0 0 ]) 
+      [ 
+        print "ERROR, 2 intels on ennemy bases while state is explore" 
+        report 1 
+      ]
+      
+      ;; intel1 is new !
+      if (intel1 != intelBase1 and intel1 != intelBase2)[
+        ifelse (intelBase1 = [ 0 0 ])[
+          set intelBase1 intel1
+          set mem3 durandil-set-componant mem3 0 item 0 intel1
+          set mem3 durandil-set-componant mem3 1 item 1 intel1
+        ]
+        [
+          set intelBase2 intel1
+          set mem3 durandil-set-componant mem3 2 item 0 intel1
+          set mem3 durandil-set-componant mem3 3 item 1 intel1
+        ]
+      ]
+      
+      ;; intel2 is new !
+      if (intel2 != intelBase1 and intel2 != intelBase2)[
+        ifelse (intelBase1 = [ 0 0 ])[
+          set intelBase1 intel2
+          set mem3 durandil-set-componant mem3 0 item 0 intel2
+          set mem3 durandil-set-componant mem3 1 item 1 intel2
+        ]
+        [
+          set intelBase2 intel2
+          set mem3 durandil-set-componant mem3 2 item 0 intel2
+          set mem3 durandil-set-componant mem3 3 item 1 intel2
+        ]
+      ]
+      
+      ;; all the intels are collected, pass to phase 2
+      if (intelBase1 != [ 0 0 ] and intelBase2 != [ 0 0 ])
+      [
+        ;; 1 = explorer, 2 = mod explore
+        set mem5 durandil-set-componant mem5 1 2
+      ]
+    ]
   ]
-  if (energy_red > 5 * energy_green)[
-    durandil-attackBase
-  ]
-  let t one-of perceive-specific-robots ennemy rocketlaunchers
-  if (t != nobody) [
-    launch-rocket towards t
-  ]
+  report 0
 end
 
-;; procedure pour initialiser les explorers rouges
-to initRedExplorer
-end
-
-;; procedure pour initialiser les rocket-launchers rouges
-to initRedRocketLauncher
-end
-
-;; procedure pour initialiser les rocket-launchers rouges
-to initRedHarvester
-end
-
-;; procedure pour initialiser les bases rouges
-to initRedBase
-    ; cré des explorers, des harvesters et des rocket-launchers
-  new-Explorer 4 self
-  new-Harvester 3 self
-  new-RocketLauncher 2 self
-end
